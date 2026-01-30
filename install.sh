@@ -160,6 +160,16 @@ register_hook("SessionStart", {
     ]
 })
 
+# UserPromptSubmit: detect-direction-change
+register_hook("UserPromptSubmit", {
+    "hooks": [
+        {
+            "type": "command",
+            "command": f"python3 {claude_dir}/hooks/detect-direction-change.py"
+        }
+    ]
+})
+
 if changed:
     with open(settings_path, "w") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)

@@ -93,6 +93,7 @@ with open(settings_path) as f:
 managed_commands = {
     f"python3 {claude_dir}/hooks/remind-principles.py",
     f"python3 {claude_dir}/hooks/restore-worklog-on-compact.py",
+    f"python3 {claude_dir}/hooks/detect-direction-change.py",
 }
 
 hooks = settings.get("hooks", {})
