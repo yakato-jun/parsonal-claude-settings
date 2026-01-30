@@ -89,30 +89,40 @@ claude_dir = sys.argv[2]
 with open(settings_path) as f:
     settings = json.load(f)
 
-hook_command = f"python3 {claude_dir}/hooks/remind-principles.py"
+# このリポジトリが管理する hook command の一覧
+managed_commands = {
+    f"python3 {claude_dir}/hooks/remind-principles.py",
+    f"python3 {claude_dir}/hooks/restore-worklog-on-compact.py",
+}
 
-post_tool_use = settings.get("hooks", {}).get("PostToolUse", [])
-original_len = len(post_tool_use)
+hooks = settings.get("hooks", {})
+changed = False
 
-# この hook の command を含むエントリを除去
-filtered = [
-    entry for entry in post_tool_use
-    if not any(h.get("command") == hook_command for h in entry.get("hooks", []))
-]
+for event_name in list(hooks.keys()):
+    entries = hooks[event_name]
+    original_len = len(entries)
+    filtered = [
+        entry for entry in entries
+        if not any(h.get("command") in managed_commands for h in entry.get("hooks", []))
+    ]
+    if len(filtered) < original_len:
+        hooks[event_name] = filtered
+        changed = True
+        print(f"  {event_name}: エントリを削除しました")
+    else:
+        print(f"  {event_name}: 該当エントリなし（スキップ）")
+    # イベントが空になったら削除
+    if not hooks[event_name]:
+        del hooks[event_name]
 
-if len(filtered) < original_len:
-    settings["hooks"]["PostToolUse"] = filtered
-    # PostToolUse が空になったら削除
-    if not filtered:
-        del settings["hooks"]["PostToolUse"]
-    # hooks 自体が空になったら削除
-    if not settings["hooks"]:
-        del settings["hooks"]
+# hooks 自体が空になったら削除
+if "hooks" in settings and not settings["hooks"]:
+    del settings["hooks"]
+
+if changed:
     with open(settings_path, "w") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
-    print("  hook 登録: settings.json から削除しました")
-else:
-    print("  hook 登録: 該当エントリなし（スキップ）")
+    print("  settings.json を更新しました")
 PYEOF
 fi
 

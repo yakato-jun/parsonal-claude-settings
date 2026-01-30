@@ -117,36 +117,53 @@ claude_dir = sys.argv[2]
 with open(settings_path) as f:
     settings = json.load(f)
 
-hook_command = f"python3 {claude_dir}/hooks/remind-principles.py"
+hooks = settings.setdefault("hooks", {})
+changed = False
 
-# 追加したい hook エントリ
-new_entry = {
+
+def register_hook(event_name, entry):
+    """指定イベントに hook エントリを登録（重複チェック付き）"""
+    global changed
+    event_hooks = hooks.setdefault(event_name, [])
+    # entry 内の command を抽出して重複チェック
+    new_commands = {h["command"] for h in entry.get("hooks", [])}
+    already_exists = any(
+        any(h.get("command") in new_commands for h in e.get("hooks", []))
+        for e in event_hooks
+    )
+    if already_exists:
+        print(f"  {event_name}: 既に登録済み")
+    else:
+        event_hooks.append(entry)
+        changed = True
+        print(f"  {event_name}: 登録しました")
+
+
+# PostToolUse: remind-principles
+register_hook("PostToolUse", {
     "matcher": "Edit|Write|Bash",
     "hooks": [
         {
             "type": "command",
-            "command": hook_command
+            "command": f"python3 {claude_dir}/hooks/remind-principles.py"
         }
     ]
-}
+})
 
-# hooks.PostToolUse が存在するか確認
-hooks = settings.setdefault("hooks", {})
-post_tool_use = hooks.setdefault("PostToolUse", [])
+# SessionStart: restore-worklog-on-compact
+register_hook("SessionStart", {
+    "hooks": [
+        {
+            "type": "command",
+            "command": f"python3 {claude_dir}/hooks/restore-worklog-on-compact.py"
+        }
+    ]
+})
 
-# 既に同じ command が登録されていればスキップ
-already_exists = any(
-    any(h.get("command") == hook_command for h in entry.get("hooks", []))
-    for entry in post_tool_use
-)
-
-if already_exists:
-    print("  hook 登録: 既に登録済み")
-else:
-    post_tool_use.append(new_entry)
+if changed:
     with open(settings_path, "w") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
-    print("  hook 登録: settings.json に追加しました")
+    print("  settings.json を更新しました")
 PYEOF
 
 echo ""
