@@ -10,9 +10,10 @@ set -euo pipefail
 #   ./install.sh
 #
 # 動作:
-#   - commands/, agents/ 内のファイルを ~/.claude/ の対応ディレクトリに symlink
+#   - commands/, agents/, hooks/ 内のファイルを ~/.claude/ の対応ディレクトリに symlink
 #   - 既存の通常ファイルがあれば .bak を付けてバックアップ
 #   - 既に正しい symlink があればスキップ（冪等）
+#   - hooks の登録を ~/.claude/settings.json に追加
 # =============================================================================
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -85,6 +86,62 @@ for f in "${REPO_DIR}"/agents/*.md; do
   [ -f "$f" ] || continue
   link_file "agents/$(basename "$f")"
 done
+
+# hooks/ 内のファイル
+for f in "${REPO_DIR}"/hooks/*; do
+  [ -f "$f" ] || continue
+  link_file "hooks/$(basename "$f")"
+done
+
+# --- グローバル settings.json に hook 登録を追加 ---
+SETTINGS_FILE="${CLAUDE_DIR}/settings.json"
+
+# settings.json が存在しなければ空オブジェクトで作成
+if [ ! -f "$SETTINGS_FILE" ]; then
+  echo '{}' > "$SETTINGS_FILE"
+fi
+
+# python3 が使えることを前提に hook 設定をマージ
+python3 - "$SETTINGS_FILE" "$CLAUDE_DIR" <<'PYEOF'
+import json, sys
+
+settings_path = sys.argv[1]
+claude_dir = sys.argv[2]
+
+with open(settings_path) as f:
+    settings = json.load(f)
+
+hook_command = f"python3 {claude_dir}/hooks/remind-principles.py"
+
+# 追加したい hook エントリ
+new_entry = {
+    "matcher": "Edit|Write|Bash",
+    "hooks": [
+        {
+            "type": "command",
+            "command": hook_command
+        }
+    ]
+}
+
+# hooks.PostToolUse が存在するか確認
+hooks = settings.setdefault("hooks", {})
+post_tool_use = hooks.setdefault("PostToolUse", [])
+
+# 既に同じ command が登録されていればスキップ
+already_exists = any(
+    any(h.get("command") == hook_command for h in entry.get("hooks", []))
+    for entry in post_tool_use
+)
+
+if already_exists:
+    print("  hook 登録: 既に登録済み")
+else:
+    post_tool_use.append(new_entry)
+    with open(settings_path, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+    print("  hook 登録: settings.json に追加しました")
+PYEOF
 
 echo ""
 echo "完了しました。"
