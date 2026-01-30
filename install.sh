@@ -93,6 +93,12 @@ for f in "${REPO_DIR}"/hooks/*; do
   link_file "hooks/$(basename "$f")"
 done
 
+# assets/ 内のファイル
+for f in "${REPO_DIR}"/assets/*; do
+  [ -f "$f" ] || continue
+  link_file "assets/$(basename "$f")"
+done
+
 # --- グローバル settings.json に hook 登録を追加 ---
 SETTINGS_FILE="${CLAUDE_DIR}/settings.json"
 

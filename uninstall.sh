@@ -71,6 +71,11 @@ for f in "${REPO_DIR}"/hooks/*; do
   unlink_file "hooks/$(basename "$f")"
 done
 
+for f in "${REPO_DIR}"/assets/*; do
+  [ -f "$f" ] || continue
+  unlink_file "assets/$(basename "$f")"
+done
+
 # --- settings.json から hook 登録を削除 ---
 SETTINGS_FILE="${CLAUDE_DIR}/settings.json"
 
