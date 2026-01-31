@@ -42,6 +42,16 @@ def main():
         ts = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
         candidates.append(f"  - {dir_name}/worklog.md (updated: {ts})")
 
+    common_verify = (
+        "## 重複作業の防止（必須）:\n"
+        "ワークログが compact 前に更新されていない可能性がある。\n"
+        "ワークログの内容を鵜呑みにせず、以下で実際の作業痕跡を確認すること:\n"
+        "- `git log --oneline -10` で直近のコミットを確認\n"
+        "- `git diff --stat` で未コミットの変更を確認\n"
+        "- ワークログ上「未完了」でも、実際には完了済みの可能性がある\n"
+        "- 既に存在するコミットや変更と同じ作業を再実行しないこと\n"
+    )
+
     if candidates:
         candidate_list = "\n".join(candidates)
         message = (
@@ -50,10 +60,10 @@ def main():
             "## 検出されたワークログ:\n"
             f"{candidate_list}\n\n"
             "## 必須アクション:\n"
-            "AskUserQuestion を使って、以下をユーザーに確認すること:\n"
-            "- どのワークログの作業を再開するか（または新規作業か）\n"
-            "- 確認が取れたら、該当の worklog.md を Read で読み込んでから作業を再開する\n"
-            "- ワークログ内の Tasks セクションの未完了タスクを TaskCreate で展開する\n\n"
+            "1. AskUserQuestion でどのワークログの作業を再開するか確認する\n"
+            "2. 確認が取れたら、該当の worklog.md を Read で読み込む\n"
+            f"\n{common_verify}\n"
+            "3. 上記の照合結果を踏まえて、本当に未完了のタスクのみを TaskCreate で展開する\n\n"
             "**重要: ユーザーの確認なしに作業を再開しないこと。**"
         )
     else:
@@ -62,6 +72,7 @@ def main():
             "tmp/ 配下にワークログは見つかりませんでした。\n\n"
             "## 必須アクション:\n"
             "AskUserQuestion を使って、ユーザーに何の作業をしていたか確認すること。\n"
+            f"\n{common_verify}\n"
             "**重要: ユーザーの確認なしに作業を再開しないこと。**"
         )
 
