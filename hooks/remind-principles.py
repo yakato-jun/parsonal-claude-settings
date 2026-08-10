@@ -9,7 +9,7 @@ import os
 import sys
 
 COUNTER_FILE = "/tmp/claude_tool_counter"
-REMIND_EVERY = 5
+REMIND_EVERY = 20 
 
 # principles.txt のパス（このスクリプトと同じディレクトリ）
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

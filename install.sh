@@ -10,7 +10,8 @@ set -euo pipefail
 #   ./install.sh
 #
 # 動作:
-#   - commands/, agents/, hooks/ 内のファイルを ~/.claude/ の対応ディレクトリに symlink
+#   - commands/, agents/, hooks/, globals/ 内のファイルを ~/.claude/ の対応ディレクトリに symlink
+#   - globals/ 内の .md は ~/.claude/ 直下に配置し、CLAUDE.md にインポート行を追記
 #   - 既存の通常ファイルがあれば .bak を付けてバックアップ
 #   - 既に正しい symlink があればスキップ（冪等）
 #   - hooks の登録を ~/.claude/settings.json に追加
@@ -97,6 +98,61 @@ done
 for f in "${REPO_DIR}"/assets/*; do
   [ -f "$f" ] || continue
   link_file "assets/$(basename "$f")"
+done
+
+# globals/ 内の .md ファイル → ~/.claude/ 直下に配置
+for f in "${REPO_DIR}"/globals/*.md; do
+  [ -f "$f" ] || continue
+  local_name="$(basename "$f")"
+  src="${REPO_DIR}/globals/${local_name}"
+  dst="${CLAUDE_DIR}/${local_name}"
+
+  # 既に正しい symlink ならスキップ
+  if [ -L "$dst" ] && [ "$(readlink -f "$dst")" = "$(readlink -f "$src")" ]; then
+    info "既にリンク済み: ${local_name}"
+  else
+    # 既存の通常ファイルをバックアップ
+    if [ -f "$dst" ] && [ ! -L "$dst" ]; then
+      warn "既存ファイルをバックアップ: ${dst} -> ${dst}.bak"
+      mv "$dst" "${dst}.bak"
+    fi
+    # 既存の壊れた/異なる symlink を削除
+    if [ -L "$dst" ]; then
+      rm "$dst"
+    fi
+    ln -s "$src" "$dst"
+    info "リンク作成: ${local_name} (globals/)"
+  fi
+done
+
+# CLAUDE.md にインポート行を追記する関数
+inject_claude_md_import() {
+  local filename="$1"
+  local claude_md="${CLAUDE_DIR}/CLAUDE.md"
+
+  if [ ! -f "$claude_md" ]; then
+    warn "CLAUDE.md が見つかりません: ${claude_md}"
+    return 1
+  fi
+
+  # 既に存在すればスキップ（コメントアウトされたものは除外）
+  if grep -qE "^@${filename}$" "$claude_md"; then
+    info "CLAUDE.md: @${filename} は既に登録済み"
+    return 0
+  fi
+
+  # Custom Imports セクションがなければ作成
+  if ! grep -q "# Custom Imports" "$claude_md"; then
+    printf '\n# Custom Imports\n' >> "$claude_md"
+  fi
+  echo "@${filename}" >> "$claude_md"
+  info "CLAUDE.md: @${filename} を追記しました"
+}
+
+# globals/ 内の .md ファイルのインポート行を登録
+for f in "${REPO_DIR}"/globals/*.md; do
+  [ -f "$f" ] || continue
+  inject_claude_md_import "$(basename "$f")"
 done
 
 # --- グローバル settings.json に hook 登録を追加 ---
