@@ -10,15 +10,25 @@ set -euo pipefail
 #   ./install.sh
 #
 # 動作:
-#   - commands/, agents/, hooks/, globals/ 内のファイルを ~/.claude/ の対応ディレクトリに symlink
+#   - commands/, agents/, hooks/, output-styles/, globals/ 内のファイルを ~/.claude/ の対応ディレクトリに symlink
 #   - globals/ 内の .md は ~/.claude/ 直下に配置し、CLAUDE.md にインポート行を追記
 #   - 既存の通常ファイルがあれば .bak を付けてバックアップ
 #   - 既に正しい symlink があればスキップ（冪等）
-#   - hooks の登録を ~/.claude/settings.json に追加
+#   - hooks の ~/.claude/settings.json への登録は --with-hooks 指定時のみ
+#     （hooks ファイルの symlink は常に作成する。登録だけが opt-in）
 # =============================================================================
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_DIR="${HOME}/.claude"
+
+# hooks の settings.json 登録は opt-in（既定は hooks 無効運用のため登録しない）
+WITH_HOOKS=0
+for arg in "$@"; do
+  case "$arg" in
+    --with-hooks) WITH_HOOKS=1 ;;
+    *) echo "不明なオプション: $arg"; echo "使い方: ./install.sh [--with-hooks]"; exit 1 ;;
+  esac
+done
 
 # 色付き出力（端末でなければ無効）
 if [ -t 1 ]; then
@@ -100,6 +110,12 @@ for f in "${REPO_DIR}"/assets/*; do
   link_file "assets/$(basename "$f")"
 done
 
+# output-styles/ 内の .md ファイル
+for f in "${REPO_DIR}"/output-styles/*.md; do
+  [ -f "$f" ] || continue
+  link_file "output-styles/$(basename "$f")"
+done
+
 # globals/ 内の .md ファイル → ~/.claude/ 直下に配置
 for f in "${REPO_DIR}"/globals/*.md; do
   [ -f "$f" ] || continue
@@ -155,7 +171,14 @@ for f in "${REPO_DIR}"/globals/*.md; do
   inject_claude_md_import "$(basename "$f")"
 done
 
-# --- グローバル settings.json に hook 登録を追加 ---
+# --- グローバル settings.json に hook 登録を追加（--with-hooks 指定時のみ） ---
+if [ "$WITH_HOOKS" -eq 0 ]; then
+  info "hooks の settings.json 登録をスキップ（--with-hooks で有効化）"
+  echo ""
+  echo "完了しました。"
+  exit 0
+fi
+
 SETTINGS_FILE="${CLAUDE_DIR}/settings.json"
 
 # settings.json が存在しなければ空オブジェクトで作成
